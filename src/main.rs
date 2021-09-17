@@ -3,6 +3,7 @@ use async_std::task;
 use log::trace;
 use serde::Deserialize;
 use std::{env, process::exit, time::Instant};
+use strip_bom::*;
 use svn_cmd::{Credentials, SvnCmd, SvnList};
 
 #[async_std::main]
@@ -34,16 +35,19 @@ struct SvnCommand {
 
 #[derive(Deserialize)]
 struct GameConfiguration {
+    #[serde(rename(deserialize = "LineOptions"))]
     line_options: LineOptions,
 }
 
 #[derive(Deserialize)]
 struct LineOptions {
+    #[serde(rename(deserialize = "LineOption"))]
     line_option: LineOption,
 }
 
 #[derive(Deserialize)]
 struct LineOption {
+    #[serde(rename(deserialize = "Line"))]
     line: Vec<Line>,
 }
 
@@ -73,7 +77,8 @@ impl SvnCommand {
     ) -> Result<usize> {
         trace!("parsing config file: {}", cds_config_path);
         let xml_text = self.cmd.cat(cds_config_path).await?;
-        let config: GameConfiguration = serde_xml_rs::from_str(&xml_text)?;
+        let xml_text = xml_text.strip_bom();
+        let config: GameConfiguration = serde_xml_rs::from_str(xml_text)?;
         Ok(config.line_options.line_option.line.len())
     }
 }
@@ -114,10 +119,17 @@ async fn process(path: &str) -> Result<()> {
     task::block_on(async {
         for t in tasks {
             let (antebet_count, cfg_file) = t.await;
-            println!(
+            trace!(
                 "cfg file: {}, with antebet lines: {}",
-                cfg_file, antebet_count
+                cfg_file,
+                antebet_count
             );
+            if antebet_count > 1 {
+                println!(
+                    "cfg file: {}, with antebet lines: {}",
+                    cfg_file, antebet_count
+                );
+            }
         }
     });
     Ok(())
