@@ -1,6 +1,5 @@
 use anyhow::Result;
 use async_std::task;
-use log::info;
 use serde::Deserialize;
 use std::{env, process::exit, time::Instant};
 use svn_cmd::{Credentials, SvnCmd, SvnList};
@@ -10,7 +9,11 @@ async fn main() -> Result<()> {
     env_logger::init();
     let start_instant = Instant::now();
     let root_path = get_svn_path_from_cli_args();
-
+    process(&root_path).await?;
+    println!(
+        "cmd executed in {} msecs",
+        start_instant.elapsed().as_millis()
+    );
     Ok(())
 }
 
@@ -96,11 +99,24 @@ async fn process(path: &str) -> Result<()> {
     let mut tasks = Vec::new();
     for cfg_file in cfg_files.into_iter() {
         let cmd = cmd.clone();
+        let cfg_file = cfg_file.clone();
         tasks.push(task::spawn(async move {
-            cmd.parse_cds_config_and_check_lineoptions_count(&cfg_file)
-                .await
-                .unwrap();
+            (
+                cmd.parse_cds_config_and_check_lineoptions_count(&cfg_file)
+                    .await
+                    .unwrap(),
+                cfg_file,
+            )
         }));
     }
+    task::block_on(async {
+        for t in tasks {
+            let (antebet_count, cfg_file) = t.await;
+            println!(
+                "cfg file: {}, with antebet lines: {}",
+                cfg_file, antebet_count
+            );
+        }
+    });
     Ok(())
 }
