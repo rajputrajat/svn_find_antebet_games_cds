@@ -1,5 +1,5 @@
 use anyhow::Result;
-use async_std::task;
+use async_std::{fs::read_to_string, task};
 use log::trace;
 use serde::Deserialize;
 use std::{env, process::exit, time::Instant};
@@ -10,8 +10,8 @@ use svn_cmd::{Credentials, SvnCmd, SvnList};
 async fn main() -> Result<()> {
     env_logger::init();
     let start_instant = Instant::now();
-    let root_path = get_svn_path_from_cli_args();
-    process(&root_path).await?;
+    let cmd_ops = get_cmd_args();
+    process(&cmd_ops).await?;
     println!(
         "cmd executed in {} msecs",
         start_instant.elapsed().as_millis()
@@ -19,13 +19,35 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-fn get_svn_path_from_cli_args() -> String {
-    if let Some(path) = env::args().nth(1) {
-        path
-    } else {
-        eprintln!("provide svn path as cli argument.");
-        exit(1);
+const ERROR_HELP: &str = "##
+USAGE:
+    ./svn_find_antebet_games_cds.exe --svn-path <svn url>
+    ./svn_find_antebet_games_cds.exe --svn-path <svn url> --list-file <svn list --xml svn-path>
+##";
+
+enum CmdOptions {
+    SvnPath(String),
+    ListFilePath(String, String),
+}
+
+fn get_cmd_args() -> CmdOptions {
+    if let Some(flag1) = env::args().nth(1) {
+        if &flag1 == "--svn-path" {
+            if let Some(url) = env::args().nth(2) {
+                if let Some(flag2) = env::args().nth(3) {
+                    if &flag2 == "--list-file" {
+                        if let Some(path) = env::args().nth(4) {
+                            return CmdOptions::ListFilePath(url, path);
+                        }
+                    }
+                } else {
+                    return CmdOptions::SvnPath(url);
+                }
+            }
+        }
     }
+    eprintln!("{}", ERROR_HELP);
+    exit(1);
 }
 
 #[derive(Clone)]
@@ -67,8 +89,13 @@ impl SvnCommand {
         })
     }
 
-    async fn get_svn_list(&self, path: &str) -> Result<SvnList> {
-        Ok(self.cmd.list(path, true).await?)
+    async fn get_svn_list(&self, url: &str) -> Result<SvnList> {
+        Ok(self.cmd.list(url, true).await?)
+    }
+
+    async fn get_svn_list_from_list_cmd_out(&self, path: &str) -> Result<SvnList> {
+        let xml_str = read_to_string(&path).await?;
+        Ok(self.cmd.list_from_svn_list_xml_output(&xml_str).await?)
     }
 
     async fn parse_cds_config_and_check_lineoptions_count(
@@ -99,10 +126,15 @@ fn find_cfg_file_paths(path: &str, svn_list: SvnList) -> Vec<String> {
         .collect()
 }
 
-async fn process(path: &str) -> Result<()> {
+async fn process(cmd_ops: &CmdOptions) -> Result<()> {
     let cmd = SvnCommand::new()?;
-    let list = cmd.get_svn_list(path).await?;
-    let cfg_files = find_cfg_file_paths(path, list);
+    let (url, list) = match &cmd_ops {
+        CmdOptions::SvnPath(url) => (url.clone(), cmd.get_svn_list(url).await?),
+        CmdOptions::ListFilePath(url, path) => {
+            (url.clone(), cmd.get_svn_list_from_list_cmd_out(path).await?)
+        }
+    };
+    let cfg_files = find_cfg_file_paths(&url, list);
     let mut tasks = Vec::new();
     for cfg_file in cfg_files.into_iter() {
         let cmd = cmd.clone();

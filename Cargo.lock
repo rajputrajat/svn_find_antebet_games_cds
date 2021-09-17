@@ -649,7 +649,7 @@ checksum = "20cecc5f9998340da802809fe89e8a769b192960cf4dd77fccd9da7f60821d33"
 [[package]]
 name = "svn-cmd"
 version = "0.1.0"
-source = "git+https://github.com/rajputrajat/svn-cmd.git#306b892a03861cb289c0d3f3457c29dd76bf9aaa"
+source = "git+https://github.com/rajputrajat/svn-cmd.git#a9d0c999de3ec588c19cdc7b25562d9ad724716f"
 dependencies = [
  "async-std",
  "chrono",
