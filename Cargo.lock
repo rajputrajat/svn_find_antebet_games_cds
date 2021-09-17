@@ -643,7 +643,7 @@ dependencies = [
 [[package]]
 name = "svn-cmd"
 version = "0.1.0"
-source = "git+https://github.com/rajputrajat/svn-cmd.git#5a42a5c4f9c4118aa85347076ddbedd2ddea5c14"
+source = "git+https://github.com/rajputrajat/svn-cmd.git#306b892a03861cb289c0d3f3457c29dd76bf9aaa"
 dependencies = [
  "async-std",
  "chrono",
@@ -667,6 +667,8 @@ dependencies = [
  "async-std",
  "env_logger",
  "log",
+ "serde",
+ "serde-xml-rs",
  "svn-cmd",
 ]
 
