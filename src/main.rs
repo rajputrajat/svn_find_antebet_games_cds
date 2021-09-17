@@ -19,11 +19,11 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-const ERROR_HELP: &str = "##
+const ERROR_HELP: &str = r##"
 USAGE:
     ./svn_find_antebet_games_cds.exe --svn-path <svn url>
     ./svn_find_antebet_games_cds.exe --svn-path <svn url> --list-file <svn list --xml svn-path>
-##";
+"##;
 
 enum CmdOptions {
     SvnPath(String),
@@ -64,7 +64,7 @@ struct GameConfiguration {
 #[derive(Deserialize)]
 struct LineOptions {
     #[serde(rename(deserialize = "LineOption"))]
-    line_option: LineOption,
+    line_option: Vec<LineOption>,
 }
 
 #[derive(Deserialize)]
@@ -101,12 +101,17 @@ impl SvnCommand {
     async fn parse_cds_config_and_check_lineoptions_count(
         &self,
         cds_config_path: &str,
-    ) -> Result<usize> {
+    ) -> Result<Vec<usize>> {
         trace!("parsing config file: {}", cds_config_path);
         let xml_text = self.cmd.cat(cds_config_path).await?;
         let xml_text = xml_text.strip_bom();
         let config: GameConfiguration = serde_xml_rs::from_str(xml_text)?;
-        Ok(config.line_options.line_option.line.len())
+        Ok(config
+            .line_options
+            .line_option
+            .iter()
+            .map(|l| l.line.len())
+            .collect())
     }
 }
 
@@ -141,9 +146,16 @@ async fn process(cmd_ops: &CmdOptions) -> Result<()> {
         let cfg_file = cfg_file.clone();
         tasks.push(task::spawn(async move {
             (
-                cmd.parse_cds_config_and_check_lineoptions_count(&cfg_file)
+                match cmd
+                    .parse_cds_config_and_check_lineoptions_count(&cfg_file)
                     .await
-                    .unwrap(),
+                {
+                    Ok(o) => o,
+                    Err(e) => {
+                        eprintln!("error: {:?} in file: {}", e, cfg_file);
+                        panic!("out");
+                    }
+                },
                 cfg_file,
             )
         }));
@@ -152,13 +164,13 @@ async fn process(cmd_ops: &CmdOptions) -> Result<()> {
         for t in tasks {
             let (antebet_count, cfg_file) = t.await;
             trace!(
-                "cfg file: {}, with antebet lines: {}",
+                "cfg file: {}, with antebet lines: {:?}",
                 cfg_file,
                 antebet_count
             );
-            if antebet_count > 1 {
+            if antebet_count.len() > 1 || antebet_count.get(0).unwrap() > &1 {
                 println!(
-                    "cfg file: {}, with antebet lines: {}",
+                    "cfg file: {}, with antebet lines: {:?}",
                     cfg_file, antebet_count
                 );
             }
