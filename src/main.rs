@@ -1,5 +1,6 @@
 use anyhow::Result;
 use async_std::task;
+use log::trace;
 use serde::Deserialize;
 use std::{env, process::exit, time::Instant};
 use svn_cmd::{Credentials, SvnCmd, SvnList};
@@ -70,6 +71,7 @@ impl SvnCommand {
         &self,
         cds_config_path: &str,
     ) -> Result<usize> {
+        trace!("parsing config file: {}", cds_config_path);
         let xml_text = self.cmd.cat(cds_config_path).await?;
         let config: GameConfiguration = serde_xml_rs::from_str(&xml_text)?;
         Ok(config.line_options.line_option.line.len())
