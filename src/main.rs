@@ -2,7 +2,7 @@ use anyhow::Result;
 use async_std::{fs::read_to_string, task};
 use log::trace;
 use serde::Deserialize;
-use std::{env, process::exit, time::Instant};
+use std::{env, process::exit, sync::Arc, time::Instant};
 use strip_bom::*;
 use svn_cmd::{Credentials, SvnCmd, SvnList};
 
@@ -26,8 +26,8 @@ USAGE:
 "##;
 
 enum CmdOptions {
-    SvnPath(String),
-    ListFilePath(String, String),
+    SvnPath(Arc<String>),
+    ListFilePath(Arc<String>, String),
 }
 
 fn get_cmd_args() -> CmdOptions {
@@ -37,11 +37,11 @@ fn get_cmd_args() -> CmdOptions {
                 if let Some(flag2) = env::args().nth(3) {
                     if &flag2 == "--list-file" {
                         if let Some(path) = env::args().nth(4) {
-                            return CmdOptions::ListFilePath(url, path);
+                            return CmdOptions::ListFilePath(Arc::new(url), path);
                         }
                     }
                 } else {
-                    return CmdOptions::SvnPath(url);
+                    return CmdOptions::SvnPath(Arc::new(url));
                 }
             }
         }
